@@ -1,0 +1,64 @@
+jobs:
+  build:
+    docker:
+      - image: python:3.6                   # similar to "image" in GitLab
+    steps:
+      - checkout
+      - run: |                              # similar to "script" in GitLab
+          pip install -r requirements.txt
+          python manage.py check
+
+  test:
+    docker:
+      - image: python:3.6
+    steps:
+      - checkout
+      - run: |
+          pip install -r requirements.txt
+          python manage.py test taskManager
+
+  integration:
+    docker:
+      - image: python:3.6
+    steps:
+      - checkout
+      - run:
+          command: |
+            echo "This is an integration step"
+            exit 1
+          when: always                    # Even if the job fails, continue to the next stages
+
+  prod:
+    docker:
+      - image: python:3.6
+    steps:
+      - checkout
+      - run: echo "This is a deploy step."
+
+  release:
+    machine: true                                        # What is this for?
+    steps:
+      - checkout
+
+      - run: |
+          echo $DOCKERHUB_PASSWORD | docker login -u $DOCKERHUB_USERNAME --password-stdin
+          docker build -t $DOCKER_USERNAME/django.nv .   # Build the application into Docker image
+          docker push $DOCKER_USERNAME/django.nv         # Push the image into registry
+
+
+workflows:
+  version: 2
+  django:
+    jobs:
+      - build
+      - test:
+          requires:
+            - build 
+      - integration:
+          requires:
+            - test
+      - prod:
+          type: approval
+          requires:
+            - integration
+      - release
